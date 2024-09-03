@@ -123,6 +123,10 @@ def main(excel_file, use_parallel=False):
 
     workbook = openpyxl.load_workbook(excel_file)
 
+    # Count total number of rows to process
+    total_rows = 2 * sum(worksheet.max_row - 1 for worksheet in workbook.worksheets)
+    processed_rows = 0
+
     if use_parallel:
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures = []
@@ -137,7 +141,10 @@ def main(excel_file, use_parallel=False):
                     if tsg_tdoc:
                         futures.append(executor.submit(process_tdoc, row, "TSG", tsg_tdoc, 12, stats, failed_downloads, failed_extractions))
             
-            concurrent.futures.wait(futures)
+            for future in concurrent.futures.as_completed(futures):
+                processed_rows += 1
+                progress = (processed_rows / total_rows) * 100
+                logger.info(f"Overall progress: {progress:.2f}% ({processed_rows}/{total_rows})")
     else:
         for sheet in workbook.sheetnames:
             worksheet = workbook[sheet]
@@ -149,6 +156,10 @@ def main(excel_file, use_parallel=False):
                     process_tdoc(row, "WG", wg_tdoc, 8, stats, failed_downloads, failed_extractions)
                 if tsg_tdoc:
                     process_tdoc(row, "TSG", tsg_tdoc, 12, stats, failed_downloads, failed_extractions)
+                
+                processed_rows += 1
+                progress = (processed_rows / total_rows) * 100
+                logger.info(f"Overall progress: {progress:.2f}% ({processed_rows}/{total_rows})")
 
     workbook.close()
 
